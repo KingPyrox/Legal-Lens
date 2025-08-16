@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgTier {
+  SOLO
+  PRO
+  BUSINESS
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum DocumentStatus {
+  PENDING
+  SCANNING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AnalysisStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ClauseRisk {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum JobState {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Organization {
+  id                String       @id @default(cuid())
+  name              String
+  tier              OrgTier      @default(SOLO)
+  dataResidency     String       @default("US")
+  retentionDays     Int          @default(30)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  memberships       Membership[]
+  documents         Document[]
+  auditLogs         AuditLog[]
+  invites           Invite[]
+  billingCustomer   BillingCustomer?
+  
+  @@map("orgs")
+}
+
+model User {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  name              String?
+  password          String?      // For email/password auth
+  authProviderId    String?      // For OAuth
+  emailVerified     DateTime?
+  image             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  memberships       Membership[]
+  documentsCreated  Document[]   @relation("DocumentCreator")
+  auditLogs         AuditLog[]
+  
+  @@map("users")
+}
+
+model Membership {
+  id                String       @id @default(cuid())
+  orgId             String
+  userId            String
+  role              UserRole
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([orgId, userId])
+  @@map("memberships")
+}
+
+model Document {
+  id                String          @id @default(cuid())
+  orgId             String
+  title             String
+  status            DocumentStatus  @default(PENDING)
+  pageCount         Int             @default(0)
+  uploadSrc         String          // Original file name
+  storageKey        String          // S3 key
+  sha256            String?
+  createdById       String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  organization      Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy         User            @relation("DocumentCreator", fields: [createdById], references: [id])
+  pages             Page[]
+  analyses          Analysis[]
+  
+  @@index([orgId])
+  @@map("documents")
+}
+
+model Page {
+  id                String       @id @default(cuid())
+  documentId        String
+  index             Int
+  storageKey        String       // S3 key for page image
+  ocrJson           Json?        // OCR results with bounding boxes
+  text              String?      @db.Text
+  confidenceAvg     Float?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  document          Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  @@unique([documentId, index])
+  @@map("pages")
+}
+
+model Analysis {
+  id                    String          @id @default(cuid())
+  documentId            String
+  jurisdiction          String?
+  jurisdictionConfidence Float?
+  startedAt             DateTime        @default(now())
+  completedAt           DateTime?
+  status                AnalysisStatus  @default(QUEUED)
+  metricsJson           Json?           // Performance metrics
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  
+  // Relations
+  document              Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  clauses               Clause[]
+  
+  @@map("analyses")
+}
+
+model Clause {
+  id                String       @id @default(cuid())
+  analysisId        String
+  type              String       // Clause type from taxonomy
+  risk              ClauseRisk
+  pageIndex         Int
+  startChar         Int
+  endChar           Int
+  text              String       @db.Text
+  rationale         String       @db.Text
+  sourcesJson       Json?        // Law Pack KB references
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  analysis          Analysis     @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  suggestions       Suggestion[]
+  
+  @@map("clauses")
+}
+
+model Suggestion {
+  id                String       @id @default(cuid())
+  clauseId          String
+  summary           String
+  whyItMatters      String       @db.Text
+  ask               String       @db.Text
+  rewriteOption     String       @db.Text
+  fallbackOption    String       @db.Text
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  clause            Clause       @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  
+  @@map("suggestions")
+}
+
+model AuditLog {
+  id                String       @id @default(cuid())
+  orgId             String
+  actorUserId       String?
+  action            String
+  targetType        String?
+  targetId          String?
+  metaJson          Json?
+  createdAt         DateTime     @default(now())
+  
+  // Relations
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actor             User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  
+  @@index([orgId, createdAt])
+  @@map("audit_logs")
+}
+
+model Invite {
+  id                String       @id @default(cuid())
+  orgId             String
+  email             String
+  role              UserRole
+  token             String       @unique
+  expiresAt         DateTime
+  acceptedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  
+  // Relations
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@map("invites")
+}
+
+model BillingCustomer {
+  id                String       @id @default(cuid())
+  orgId             String       @unique
+  stripeCustomerId  String       @unique
+  plan              String       @default("SOLO")
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  usageJson         Json?        // Usage metrics
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@map("billing_customers")
+}
+
+model Job {
+  id                String       @id @default(cuid())
+  type              String
+  payloadJson       Json
+  state             JobState     @default(PENDING)
+  attempts          Int          @default(0)
+  lastError         String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  @@index([state, type])
+  @@map("jobs")
+}
