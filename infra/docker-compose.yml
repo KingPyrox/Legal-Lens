@@ -7,10 +7,13 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: legallens
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    command: postgres -c listen_addresses='*'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -58,6 +61,26 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  api:
+    build:
+      context: ../
+      dockerfile: apps/api/Dockerfile.dev
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: "postgresql://postgres@postgres:5432/legallens?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      NODE_ENV: development
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ../apps/api:/app
+      - ../packages:/packages
+      - /app/node_modules
+      - /packages/database/node_modules
+    command: sh -c "cd /packages/database && npx prisma generate && cd /app && npm run dev"
 
 volumes:
   postgres-data:
