@@ -29,9 +29,9 @@ export class BillingService {
       });
 
       // Store customer in database
-      await this.prisma.organization.update({
-        where: { id: orgId },
+      await this.prisma.billingCustomer.create({
         data: {
+          orgId,
           stripeCustomerId: customer.id,
         },
       });
@@ -251,27 +251,30 @@ export class BillingService {
 
   // Database operations
   async createBillingRecord(data: any) {
-    return this.prisma.billing.create({
+    return this.prisma.billingCustomer.create({
       data,
     });
   }
 
   async findBillingRecords(orgId: string) {
-    return this.prisma.billing.findMany({
+    return this.prisma.billingCustomer.findUnique({
       where: { orgId },
-      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async updateBillingRecord(id: string, data: any) {
-    return this.prisma.billing.update({
-      where: { id },
+  async updateBillingRecord(orgId: string, data: any) {
+    return this.prisma.billingCustomer.update({
+      where: { orgId },
       data,
     });
   }
 
   async getBillingUsage(orgId: string, startDate?: Date, endDate?: Date) {
-    const where: any = { orgId };
+    // Use audit logs for usage tracking
+    const where: any = { 
+      orgId,
+      action: 'api_usage'
+    };
     
     if (startDate || endDate) {
       where.createdAt = {};
@@ -279,19 +282,22 @@ export class BillingService {
       if (endDate) where.createdAt.lte = endDate;
     }
 
-    return this.prisma.usage.findMany({
+    return this.prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async recordUsageInDatabase(orgId: string, type: string, quantity: number, metadata?: any) {
-    return this.prisma.usage.create({
+    return this.prisma.auditLog.create({
       data: {
         orgId,
-        type,
-        quantity,
-        metadata: metadata ? JSON.stringify(metadata) : null,
+        action: 'api_usage',
+        targetType: type,
+        metaJson: {
+          quantity,
+          ...metadata
+        },
       },
     });
   }

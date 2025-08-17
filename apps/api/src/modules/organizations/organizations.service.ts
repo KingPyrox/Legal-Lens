@@ -6,13 +6,13 @@ export class OrganizationsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: any) {
-    return this.prisma.org.create({
+    return this.prisma.organization.create({
       data,
     });
   }
 
   async findAll(userId: string) {
-    return this.prisma.org.findMany({
+    return this.prisma.organization.findMany({
       where: {
         memberships: {
           some: {
@@ -24,7 +24,7 @@ export class OrganizationsService {
   }
 
   async findOne(id: string) {
-    return this.prisma.org.findUnique({
+    return this.prisma.organization.findUnique({
       where: { id },
       include: {
         memberships: true,
@@ -33,14 +33,14 @@ export class OrganizationsService {
   }
 
   async update(id: string, data: any) {
-    return this.prisma.org.update({
+    return this.prisma.organization.update({
       where: { id },
       data,
     });
   }
 
   async remove(id: string) {
-    return this.prisma.org.delete({
+    return this.prisma.organization.delete({
       where: { id },
     });
   }

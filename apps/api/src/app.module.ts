@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AppController } from './app.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -33,5 +34,6 @@ import { DatabaseModule } from './modules/database/database.module';
     JobsModule,
     BillingModule,
   ],
+  controllers: [AppController],
 })
 export class AppModule {}

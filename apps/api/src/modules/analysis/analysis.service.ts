@@ -53,7 +53,7 @@ export class AnalysisService {
     });
   }
 
-  async updateStatus(id: string, status: string) {
+  async updateStatus(id: string, status: any) {
     return this.prisma.analysis.update({
       where: { id },
       data: { status },
@@ -74,7 +74,7 @@ export class AnalysisService {
         document: {
           orgId,
         },
-        status: 'completed',
+        status: 'COMPLETED',
       },
     });
 
@@ -83,7 +83,7 @@ export class AnalysisService {
         document: {
           orgId,
         },
-        status: 'pending',
+        status: 'QUEUED',
       },
     });
 

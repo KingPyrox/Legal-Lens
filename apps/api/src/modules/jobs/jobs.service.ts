@@ -189,25 +189,23 @@ export class JobsService {
   }
 
   // Database tracking methods
-  async trackJobInDatabase(jobId: string, type: string, status: string, data: any) {
+  async trackJobInDatabase(jobId: string, type: string, state: any, data: any) {
     return this.prisma.job.create({
       data: {
         id: jobId,
         type,
-        status,
-        data: JSON.stringify(data),
+        state,
+        payloadJson: data,
       },
     });
   }
 
-  async updateJobStatusInDatabase(jobId: string, status: string, result?: any, error?: string) {
+  async updateJobStatusInDatabase(jobId: string, state: any, result?: any, error?: string) {
     return this.prisma.job.update({
       where: { id: jobId },
       data: {
-        status,
-        result: result ? JSON.stringify(result) : null,
-        error,
-        completedAt: status === 'completed' || status === 'failed' ? new Date() : null,
+        state,
+        lastError: error,
       },
     });
   }

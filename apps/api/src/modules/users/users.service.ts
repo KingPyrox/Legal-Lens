@@ -27,7 +27,7 @@ export class UsersService {
     return this.prisma.user.create({
       data: {
         email: data.email,
-        passwordHash: hashedPassword,
+        password: hashedPassword,
         name: data.name,
       },
     });
@@ -40,10 +40,10 @@ export class UsersService {
     });
   }
 
-  async validateUser(email: string, password: string) {
+  async validateUser(email: string, pass: string) {
     const user = await this.findOne(email);
-    if (user && await bcrypt.compare(password, user.passwordHash)) {
-      const { passwordHash, ...result } = user;
+    if (user && user.password && await bcrypt.compare(pass, user.password)) {
+      const { password, ...result } = user;
       return result;
     }
     return null;
